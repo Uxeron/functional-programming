@@ -41,7 +41,15 @@ parse _ ('l' : t) =
 
 
 
+convertList :: Int -> [(Int, Char)] -> To
+convertList y ((x, sym) : t) = [(x, y, sym)] ++ convertList y t
+convertList _ [] = []
+
+convertLL :: Int -> From -> To
+convertLL num (h : t) = (convertList num h) ++ (convertLL (num+1) t)
+convertLL _ [] = []
+
 convert :: Int  -- ^ Size of the matrix (number of columns or rows)
         -> From -- ^ Parsed matrix
         -> To   -- ^ Converted matrix
-convert _ _ = expectedTo 
+convert _ ll = convertLL 0 ll
