@@ -6,6 +6,7 @@ import Data.Char
 
 parseDict :: String -> ((Int, Char), String)
 parseDict ('1':':':'v':'1':':' : sym : '1':':':'x':'1':':' : x : 'e' : t) = ((digitToInt x, sym), t)
+parseDict _ = error "Invalid dictionary"
 
 
 parseList :: String -> ([(Int, Char)], String)
@@ -17,6 +18,7 @@ parseList ('d' : t) =
             (val : list, str1)
 
 parseList ('e' : t) = ([], t)
+parseList _ = error "Invalid list"
 
 
 parseLL :: String -> ([[(Int, Char)]], String)
@@ -28,6 +30,7 @@ parseLL ('l' : t) =
             (list : ll, str1)
 
 parseLL ('e' : t) = ([], t)
+parseLL _ = error "Invalid list"
 
 
 parse :: Int    -- ^ Size of the matrix (number of columns or rows)
@@ -38,6 +41,7 @@ parse _ ('l' : t) =
             (ll, _) = parseLL t
       in
             ll
+parse _ _ = error "Invalid bencode"
 
 
 
