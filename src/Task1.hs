@@ -11,11 +11,10 @@ parseDict _ = error "Invalid dictionary"
 
 parseList :: String -> ([(Int, Char)], String)
 parseList ('d' : t) = 
-      let
+      (val : list, str1)
+      where
             (val, str) = parseDict t
             (list, str1) = parseList str
-      in
-            (val : list, str1)
 
 parseList ('e' : t) = ([], t)
 parseList _ = error "Invalid list"
@@ -23,11 +22,10 @@ parseList _ = error "Invalid list"
 
 parseLL :: String -> ([[(Int, Char)]], String)
 parseLL ('l' : t) = 
-      let 
+      (list : ll, str1)
+      where 
             (list, str) = parseList t
             (ll, str1) = parseLL str
-      in
-            (list : ll, str1)
 
 parseLL ('e' : t) = ([], t)
 parseLL _ = error "Invalid list"
@@ -36,11 +34,7 @@ parseLL _ = error "Invalid list"
 parse :: Int    -- ^ Size of the matrix (number of columns or rows)
       -> String -- ^ Encoded message
       -> From   -- ^ Parsed data structure
-parse _ ('l' : t) =  
-      let
-            (ll, _) = parseLL t
-      in
-            ll
+parse _ ('l' : t) = (\(a, _) -> a) (parseLL t)
 parse _ _ = error "Invalid bencode"
 
 
