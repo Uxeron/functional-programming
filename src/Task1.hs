@@ -34,7 +34,7 @@ parseLL _ = error "Invalid list"
 parse :: Int    -- ^ Size of the matrix (number of columns or rows)
       -> String -- ^ Encoded message
       -> From   -- ^ Parsed data structure
-parse _ ('l' : t) = (\(a, _) -> a) (parseLL t)
+parse _ ('l' : t) = fst (parseLL t)
 parse _ _ = error "Invalid bencode"
 
 
