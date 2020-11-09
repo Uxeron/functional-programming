@@ -146,7 +146,7 @@ convertDict (JLMap [("prev", JLMap map), ("last", JLArray arr)]) =
 convertDict (JLMap [("last", JLArray arr)]) = convertList (JLArray arr) 0
 
 
-mergeTouples :: ([int], [int], [char]) -> ([int], [int], [char]) -> ([int], [int], [char])
+mergeTouples :: ([Int], [Int], [Char]) -> ([Int], [Int], [Char]) -> ([Int], [Int], [Char])
 mergeTouples (a, b, c) (a', b', c') = (merge a a', merge b b', merge c c') 
 
 merge :: [a] -> [a] -> [a]
