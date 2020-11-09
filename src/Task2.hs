@@ -103,6 +103,7 @@ parseDict ('e' : t) = Right (JLArray [], t)
 parseDict t = Left ("Invalid dictionary", length t)
 
 
+
 parse :: Int                         -- ^ Size of the matrix (number of columns or rows)
       -> String                      -- ^ Encoded message
       -> Either String JsonLikeValue -- ^ Parsed data structure or error message
@@ -114,8 +115,106 @@ parse _ msg =
 parse _ _ = expectedParse
 
 
+--          - - -  C O N V E R T  - - -
+
+
+convertMoveDict :: JsonLikeValue -> Int -> To
+convertMoveDict (JLMap [("x", JLInt x), ("v", JLString v)]) y = ([x], [y], v)
+convertMoveDict (JLMap [("v", JLString v), ("x", JLInt x)]) y = ([x], [y], v)
+
+
+convertList :: JsonLikeValue -> Int -> To
+convertList (JLArray list) pos =
+    case list !! pos of
+        JLArray [] -> convertList (JLArray list) (pos + 1)
+        JLArray [JLMap map] -> convertMoveDict (JLMap map) pos
+
+
+convertDict :: JsonLikeValue -> To
+convertDict (JLMap [("last", JLArray arr), ("prev", JLMap map)]) = 
+    mergeTouples arrRet mapRet
+    where
+        arrRet = convertList (JLArray arr) 0
+        mapRet = convertDict (JLMap map)
+
+convertDict (JLMap [("prev", JLMap map), ("last", JLArray arr)]) = 
+    mergeTouples arrRet mapRet
+    where
+        arrRet = convertList (JLArray arr) 0
+        mapRet = convertDict (JLMap map)
+
+convertDict (JLMap [("last", JLArray arr)]) = convertList (JLArray arr) 0
+
+
+mergeTouples :: ([int], [int], [char]) -> ([int], [int], [char]) -> ([int], [int], [char])
+mergeTouples (a, b, c) (a', b', c') = (merge a a', merge b b', merge c c') 
+
+merge :: [a] -> [a] -> [a]
+merge xs [] = xs
+merge [] ys = ys
+merge (x:xs) (y:ys) = x : y : merge xs ys
+
+
+validateOrder :: [Char] -> Bool
+validateOrder ('X' : 'O' : t) = validateOrder ('O' : t)
+validateOrder ('O' : 'X' : t) = validateOrder ('X' : t)
+validateOrder ('X' : 'X' : _) = False
+validateOrder ('O' : 'O' : _) = False
+validateOrder _ = True
+
+
+t1 :: To -> [Int]
+t1 (a, _, _) = a
+
+t2 :: To -> [Int]
+t2 (_, b, _) = b
+
+t3 :: To -> [Char]
+t3 (_, _, c) = c
+
+
+getToupleElement :: To -> Int -> To
+getToupleElement fullTouple pos
+    | pos >= length (t1 fullTouple) = ([], [], [])
+    | otherwise = ([x], [y], [v])
+    where
+        x = (t1 fullTouple) !! pos
+        y = (t2 fullTouple) !! pos
+        v = (t3 fullTouple) !! pos
+
+
+findMark :: To -> Int -> Int -> Int -> Int -> To
+findMark fullTouple size pos x y
+    | pos >= (size * size) = ([], [], [])
+    | length (x') > 0 && x == (x' !! 0) && length (y') > 0 && y == (y' !! 0) = fullElement'
+    | otherwise = findMark fullTouple size (pos + 1) x y
+    where
+        fullElement'@(x', y', _) = getToupleElement fullTouple pos
+
+
+sortMarks :: To -> Int -> Int -> Int -> To
+sortMarks fullTouple size x y
+    | x == size = sortMarks fullTouple size 0 (y + 1)
+    | y == size = ([], [], [])
+    | otherwise = mergeTouples touple touple'
+    where
+        touple = findMark fullTouple size 0 x y
+        touple' = sortMarks fullTouple size (x + 1) y
+
+
+
 convert :: Int                      -- ^ Size of the matrix (number of columns or rows)
         -> JsonLikeValue            -- ^ Parsed non-empty list of matrices
         -> Either InvalidState To   -- ^ Converted matrix
+convert size dict = 
+    case validateOrder marks of
+        False -> Left Order
+        True -> case sortMarks fullTouple size 0 0 of
+            sortedTouple -> case length (t1 sortedTouple) == length (t1 fullTouple) of
+                False -> Left Duplicates
+                True -> Right sortedTouple
+    where
+        fullTouple@(_, _, marks) = convertDict dict
+
 convert _ _ = expectedConvert
 
