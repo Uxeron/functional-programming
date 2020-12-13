@@ -116,6 +116,10 @@ showGrid grid = do
 --                - - - P A R S E   F U N C T I O N S - - -
 
 
+-- Parses the "Last" dictionary branch, extracting the x y and symbol and putting them into the grid
+-- IN: Bencoded string, grid to fill
+-- OUT: Left: Error message, how much of the bencoded string was left to parse
+--      Right: Filled grid, last move's symbol, remaining bencoded string
 parseDictLast :: String -> Grid -> Either (String, Int) (Grid, Char, String)
 parseDictLast ('l':'d':'4':':':'d':'a':'t':'a':'l':'i': x :'e':'i': y :'e':'1':':': v :'e':'e':'e' : t) grid = 
     case isXYValid (digitToInt x) (digitToInt y) of
@@ -128,31 +132,40 @@ parseDictLast ('4':':':'l':'a':'s':'t' : t) grid = parseDictLast t grid
 parseDictLast t _ = Left ("Invalid dictionary Last", length t)
 
 
-parseDictPrev :: String -> Grid -> Either (String, Int) (Grid, Char, String)
+-- Parses the "Prev" dictionary branch by calling the branching parseDict function
+-- IN: Bencoded string, grid to fill
+-- OUT: Left: Error message, how much of the bencoded string was left to parse
+--      Right: Filled grid, remaining bencoded string
+-- Note: The correct Last Move will never come through parseDictPrev function, it will come from parseDict's direct call to parseDictLast, safe to just ignore it here
+parseDictPrev :: String -> Grid -> Either (String, Int) (Grid, String)
 parseDictPrev ('d' : t) grid = 
     case parseDict t grid of
-        Right (grid', lastMove, t') -> Right (grid', lastMove, t')
+        Right (grid', _, t') -> Right (grid', t')
         Left err -> Left err
 
 parseDictPrev ('4':':':'p':'r':'e':'v' : t) grid = parseDictPrev t grid
 parseDictPrev t _ = Left ("Invalid dictionary Previous", length t)
 
 
+-- Parses both "Prev" and "Last" branches of the general dictionary
+-- IN: Bencoded string, grid to fill
+-- OUT: Left: Error message, how much of the bencoded string was left to parse
+--      Right: Filled grid, last move's symbol, remaining bencoded string
 parseDict :: String -> Grid -> Either (String, Int) (Grid, Char, String)
 parseDict ('d' : t) grid = parseDict t grid
 parseDict ('4':':':'l':'a':'s':'t' : t) grid = 
     case parseDictLast t grid of
         Right (grid', lastMove, t') -> case t' of
-            ('e' : t''') -> Right (grid', lastMove, t''')
-            _ -> case parseDictPrev t' grid' of
-                Right (grid'', _, ('e' : t'')) -> Right (grid'', lastMove, t'')
+            ('e' : t''') -> Right (grid', lastMove, t''') -- Dict was (Prev, Last), Last parsed, nowhere further to go on this branch
+            _ -> case parseDictPrev t' grid' of           -- Dict is (Last, Prev), Last parsed, continue on to Prev
+                Right (grid'', ('e' : t'')) -> Right (grid'', lastMove, t'')
                 Right _ -> Left ("Invalid dictionary", length t)
                 Left err -> Left err
         Left err -> Left err
 
 parseDict ('4':':':'p':'r':'e':'v' : t) grid = 
     case parseDictPrev t grid of
-        Right (grid', _, t') -> case parseDictLast t' grid' of
+        Right (grid', t') -> case parseDictLast t' grid' of -- The branching dicts will always eventually end on a "Last" branch, so no need to double check before parsing
             Right (grid'', lastMove, ('e' : t'')) -> Right (grid'', lastMove, t'')
             Right _ -> Left ("Invalid dictionary", length t)
             Left err -> Left err
@@ -162,6 +175,10 @@ parseDict ('e' : t) grid = Right (grid, '_', t)
 parseDict t _ = Left ("Invalid dictionary", length t)
 
 
+-- Start function for parsing, calls the real parsers and processes their errors into readable output
+-- IN: Input bencoded string
+-- OUT: Left: Error string with message and error position in bencode string
+--      Right: Filled grid, last move's symbol
 parse :: String -> Either String (Grid, Char)
 parse msg = 
     case parseDict msg emptyGrid of
@@ -173,6 +190,10 @@ parse msg =
 
 --                - - - E N C O D E   F U N C T I O N S - - -
 
+
+-- Appends a bencoded representation of a new move to the existing move chain
+-- IN: Input bencoded string, move x, move y, move symbol
+-- OUT: Bencoded string with new move appended
 encode :: String -> Int -> Int -> Char -> String
 encode msg x y v = "d4:lastld4:datali" ++ show x ++ "ei" ++ show y ++ "e1:" ++ [v] ++ "eee4:prev" ++ msg ++ "e"
 
