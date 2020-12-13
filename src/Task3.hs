@@ -68,3 +68,60 @@ showGrid grid = do
     putStrLn [(getGridValue grid 0 1), ' ', (getGridValue grid 1 1), ' ', (getGridValue grid 2 1)]
     putStrLn [(getGridValue grid 0 2), ' ', (getGridValue grid 1 2), ' ', (getGridValue grid 2 2)]
 
+
+--                - - - P A R S E   F U N C T I O N S - - -
+
+
+parseDictLast :: String -> Grid -> Either (String, Int) (Grid, String)
+parseDictLast ('l':'d':'4':':':'d':'a':'t':'a':'l':'i': x :'e':'i': y :'e':'1':':': v :'e':'e':'e' : t) grid = 
+    case isXYValid (digitToInt x) (digitToInt y) of
+        True -> case getGridValue grid (digitToInt x) (digitToInt y) == '_' of
+            True -> Right ( setGridValue grid (digitToInt x) (digitToInt y) v, t)
+            False -> Left ("Duplicate value", length t)
+        False -> Left ("Invalid X/Y", length t)
+
+parseDictLast ('4':':':'l':'a':'s':'t' : t) grid = parseDictLast t grid
+parseDictLast t _ = Left ("Invalid dictionary Last", length t)
+
+
+parseDictPrev :: String -> Grid -> Either (String, Int) (Grid, String)
+parseDictPrev ('d' : t) grid = 
+    case parseDict t grid of
+        Right (prev, t') -> Right (prev, t')
+        Left err -> Left err
+
+parseDictPrev ('4':':':'p':'r':'e':'v' : t) grid = parseDictPrev t grid
+parseDictPrev t _ = Left ("Invalid dictionary Previous", length t)
+
+
+parseDict :: String -> Grid -> Either (String, Int) (Grid, String)
+parseDict ('d' : t) grid = parseDict t grid
+parseDict ('4':':':'l':'a':'s':'t' : t) grid = 
+    case parseDictLast t grid of
+        Right (grid', t') -> case t' of
+            ('e' : t''') -> Right (grid', t''')
+            _ -> case parseDictPrev t' grid' of
+                Right (grid'', ('e' : t'')) -> Right (grid'', t'')
+                Right _ -> Left ("Invalid dictionary", length t)
+                Left err -> Left err
+        Left err -> Left err
+
+parseDict ('4':':':'p':'r':'e':'v' : t) grid = 
+    case parseDictPrev t grid of
+        Right (grid', t') -> case parseDictLast t' grid' of
+            Right (grid'', ('e' : t'')) -> Right (grid'', t'')
+            Right _ -> Left ("Invalid dictionary", length t)
+            Left err -> Left err
+        Left err -> Left err
+
+parseDict ('e' : t) grid = Right (grid, t)
+parseDict t _ = Left ("Invalid dictionary", length t)
+
+
+parse :: String -> Either String Grid
+parse msg = 
+    case parseDict msg emptyGrid of
+        Right (val, _) -> Right val
+        Left (err, pos) -> case err == "Duplicate value" of
+            True -> Left (err ++ " at position " ++ show (length msg - pos) ++ " 101")
+            False -> Left (err ++ " at position " ++ show (length msg - pos) ++ " 100")
