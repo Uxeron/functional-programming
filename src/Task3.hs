@@ -83,6 +83,25 @@ hasWonAny :: Grid -> Bool
 hasWonAny grid = (hasWon grid 'X') || (hasWon grid 'O')
 
 
+findEmptyCellGrid :: Grid -> (Int, Int)
+findEmptyCellGrid grid = case isRowFull (t0 grid) of
+    False -> (0, findEmptyCellRow (t0 grid))
+    True -> case isRowFull (t1 grid) of
+        False -> (1, findEmptyCellRow (t1 grid))
+        True -> case isRowFull (t2 grid) of
+            False -> (2, findEmptyCellRow (t2 grid))
+            True -> (-1, -1)
+
+findEmptyCellRow :: Row -> Int
+findEmptyCellRow row = case t0 row == '_' of
+    True -> 0
+    False -> case t1 row == '_' of
+        True -> 1
+        False -> case t2 row == '_' of
+            True -> 2
+            False -> -1
+
+
 isXYValid :: Int -> Int -> Bool
 isXYValid x y = (x >= 0) && (x < 3) && (y >= 0) && (y < 3)
 
