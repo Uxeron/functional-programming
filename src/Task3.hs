@@ -1,6 +1,9 @@
 module Task3 where
 
 import Data.Char
+import System.Exit
+import System.IO
+import Control.Monad
 
 --                - - - D A T A - - -
 
@@ -8,6 +11,8 @@ type Row = (Char, Char, Char)
 type Grid = (Row, Row, Row)
 
 emptyGrid = (('_', '_', '_'), ('_', '_', '_'), ('_', '_', '_'))
+defaultGrid = (('_', '_', '_'), ('_', 'X', '_'), ('_', '_', '_'))
+
 
 -- Grid:
 -- ((a, b, c), (d, e, f), (g, h, i))
@@ -19,7 +24,6 @@ emptyGrid = (('_', '_', '_'), ('_', '_', '_'), ('_', '_', '_'))
 --  y
 --
 -- Valid values: X, O, _
-
 
 --                - - - G R I D   &   R O W   F U N C T I O N S - - -
 
@@ -94,9 +98,9 @@ invertSymbol 'O' = 'X'
 
 showGrid :: Grid -> IO ()
 showGrid grid = do
-    putStrLn [(getGridValue grid 0 0), ' ', (getGridValue grid 1 0), ' ', (getGridValue grid 2 0)]
-    putStrLn [(getGridValue grid 0 1), ' ', (getGridValue grid 1 1), ' ', (getGridValue grid 2 1)]
-    putStrLn [(getGridValue grid 0 2), ' ', (getGridValue grid 1 2), ' ', (getGridValue grid 2 2)]
+    hPutStrLn stderr [(getGridValue grid 0 0), ' ', (getGridValue grid 1 0), ' ', (getGridValue grid 2 0)]
+    hPutStrLn stderr [(getGridValue grid 0 1), ' ', (getGridValue grid 1 1), ' ', (getGridValue grid 2 1)]
+    hPutStrLn stderr [(getGridValue grid 0 2), ' ', (getGridValue grid 1 2), ' ', (getGridValue grid 2 2)]
 
 
 --                - - - P A R S E   F U N C T I O N S - - -
@@ -161,17 +165,17 @@ parseDict ('e' : t) grid = Right (grid, '_', t)
 parseDict t _ = Left ("Invalid dictionary", length t)
 
 
--- Start function for parsing, calls the real parsers and processes their errors into readable output
+-- Start function for parsing, calls the real parsers and appends the appropriate exit code
 -- IN: Input bencoded string
--- OUT: Left: Error string with message and error position in bencode string
---      Right: Filled grid, last move's symbol
-parse :: String -> Either String (Grid, Char)
-parse msg = 
-    case parseDict msg emptyGrid of
-        Right (val, lastMove, _) -> Right (val, lastMove)
-        Left (err, pos) -> case err == "Duplicate value" of
-            True -> Left (err ++ " at position " ++ show (length msg - pos) ++ " 101")
-            False -> Left (err ++ " at position " ++ show (length msg - pos) ++ " 100")
+-- OUT: Filled grid, last move's symbol, exit code
+parse :: String -> (Grid, Char, Int)
+parse msg 
+    | msg == "*" = (emptyGrid, 'O', 0)
+    | otherwise = case parseDict msg emptyGrid of
+        Right (val, lastMove, _) -> (val, lastMove, 0)
+        Left (err, _) -> case err == "Duplicate value" of
+            True -> (emptyGrid, '_', 101)
+            False -> (emptyGrid, '_', 100)
 
 
 --                - - - E N C O D E   F U N C T I O N S - - -
@@ -181,7 +185,9 @@ parse msg =
 -- IN: Input bencoded string, move x, move y, move symbol
 -- OUT: Bencoded string with new move appended
 encode :: String -> Int -> Int -> Char -> String
-encode msg x y v = "d4:lastld4:datali" ++ show x ++ "ei" ++ show y ++ "e1:" ++ [v] ++ "eee4:prev" ++ msg ++ "e"
+encode msg x y v 
+    | msg == "*" = "d4:lastld4:datali" ++ show x ++ "ei" ++ show y ++ "e1:" ++ [v] ++ "eeee"
+    | otherwise  = "d4:lastld4:datali" ++ show x ++ "ei" ++ show y ++ "e1:" ++ [v] ++ "eee4:prev" ++ msg ++ "e"
 
 
 --                - - - M I N I M A X   A L G O R I T H M   F U N C T I O N S - - -
@@ -286,6 +292,34 @@ findBestMovePregameCheck :: Grid -> Char -> (Int, Int, Int)
 findBestMovePregameCheck grid v 
     | isGridFull grid = (0, 0, 20)
     | hasWonAny grid = (0, 0, 20)
+    | grid == emptyGrid = (1, 1, 0) -- Default case, the first optimal move is center
     | otherwise = findBestMove grid v
 
+
+main :: IO ()
+main = do
+    message <- getLine
+    let (grid, v, code) = parse message
+    when (code /= 0) (exitWith (ExitFailure code))
+    
+    hPutStrLn stderr "Current game state:"
+    showGrid grid
+    
+    let v' = invertSymbol v
+    let (x, y, code') = findBestMovePregameCheck grid v'
+    when (code' == 20) (exitWith (ExitFailure code'))
+    
+    hPutStrLn stderr "My move: "
+    putStrLn (show x ++ " " ++ show y ++ " " ++ [v'])
+
+    hPutStrLn stderr "State after my move:"
+    showGrid (setGridValue grid v' x y)
+
+    let message' = encode message x y v'
+    putStrLn message'
+    
+    if code' == 0 then
+        exitWith ExitSuccess
+    else
+        exitWith (ExitFailure code')
 
