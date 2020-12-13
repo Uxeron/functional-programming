@@ -72,11 +72,11 @@ showGrid grid = do
 --                - - - P A R S E   F U N C T I O N S - - -
 
 
-parseDictLast :: String -> Grid -> Either (String, Int) (Grid, String)
+parseDictLast :: String -> Grid -> Either (String, Int) (Grid, Char, String)
 parseDictLast ('l':'d':'4':':':'d':'a':'t':'a':'l':'i': x :'e':'i': y :'e':'1':':': v :'e':'e':'e' : t) grid = 
     case isXYValid (digitToInt x) (digitToInt y) of
         True -> case getGridValue grid (digitToInt x) (digitToInt y) == '_' of
-            True -> Right ( setGridValue grid (digitToInt x) (digitToInt y) v, t)
+            True -> Right ( setGridValue grid (digitToInt x) (digitToInt y) v, v, t)
             False -> Left ("Duplicate value", length t)
         False -> Left ("Invalid X/Y", length t)
 
@@ -84,44 +84,52 @@ parseDictLast ('4':':':'l':'a':'s':'t' : t) grid = parseDictLast t grid
 parseDictLast t _ = Left ("Invalid dictionary Last", length t)
 
 
-parseDictPrev :: String -> Grid -> Either (String, Int) (Grid, String)
+parseDictPrev :: String -> Grid -> Either (String, Int) (Grid, Char, String)
 parseDictPrev ('d' : t) grid = 
     case parseDict t grid of
-        Right (prev, t') -> Right (prev, t')
+        Right (grid', lastMove, t') -> Right (grid', lastMove, t')
         Left err -> Left err
 
 parseDictPrev ('4':':':'p':'r':'e':'v' : t) grid = parseDictPrev t grid
 parseDictPrev t _ = Left ("Invalid dictionary Previous", length t)
 
 
-parseDict :: String -> Grid -> Either (String, Int) (Grid, String)
+parseDict :: String -> Grid -> Either (String, Int) (Grid, Char, String)
 parseDict ('d' : t) grid = parseDict t grid
 parseDict ('4':':':'l':'a':'s':'t' : t) grid = 
     case parseDictLast t grid of
-        Right (grid', t') -> case t' of
-            ('e' : t''') -> Right (grid', t''')
+        Right (grid', lastMove, t') -> case t' of
+            ('e' : t''') -> Right (grid', lastMove, t''')
             _ -> case parseDictPrev t' grid' of
-                Right (grid'', ('e' : t'')) -> Right (grid'', t'')
+                Right (grid'', _, ('e' : t'')) -> Right (grid'', lastMove, t'')
                 Right _ -> Left ("Invalid dictionary", length t)
                 Left err -> Left err
         Left err -> Left err
 
 parseDict ('4':':':'p':'r':'e':'v' : t) grid = 
     case parseDictPrev t grid of
-        Right (grid', t') -> case parseDictLast t' grid' of
-            Right (grid'', ('e' : t'')) -> Right (grid'', t'')
+        Right (grid', _, t') -> case parseDictLast t' grid' of
+            Right (grid'', lastMove, ('e' : t'')) -> Right (grid'', lastMove, t'')
             Right _ -> Left ("Invalid dictionary", length t)
             Left err -> Left err
         Left err -> Left err
 
-parseDict ('e' : t) grid = Right (grid, t)
+parseDict ('e' : t) grid = Right (grid, '_', t)
 parseDict t _ = Left ("Invalid dictionary", length t)
 
 
-parse :: String -> Either String Grid
+parse :: String -> Either String (Grid, Char)
 parse msg = 
     case parseDict msg emptyGrid of
-        Right (val, _) -> Right val
+        Right (val, lastMove, _) -> Right (val, lastMove)
         Left (err, pos) -> case err == "Duplicate value" of
             True -> Left (err ++ " at position " ++ show (length msg - pos) ++ " 101")
             False -> Left (err ++ " at position " ++ show (length msg - pos) ++ " 100")
+
+
+--                - - - E N C O D E   F U N C T I O N S - - -
+
+encode :: String -> Int -> Int -> Char -> String
+encode msg x y v = "d4:lastld4:datali" ++ show x ++ "ei" ++ show y ++ "e1:" ++ [v] ++ "eee4:prev" ++ msg ++ "e"
+
+
