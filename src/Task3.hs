@@ -60,3 +60,11 @@ isRowFull row = (t0 row /= '_') && (t1 row /= '_') && (t2 row /= '_')
 
 isXYValid :: Int -> Int -> Bool
 isXYValid x y = (x >= 0) && (x < 3) && (y >= 0) && (y < 3)
+
+
+showGrid :: Grid -> IO ()
+showGrid grid = do
+    putStrLn [(getGridValue grid 0 0), ' ', (getGridValue grid 1 0), ' ', (getGridValue grid 2 0)]
+    putStrLn [(getGridValue grid 0 1), ' ', (getGridValue grid 1 1), ' ', (getGridValue grid 2 1)]
+    putStrLn [(getGridValue grid 0 2), ' ', (getGridValue grid 1 2), ' ', (getGridValue grid 2 2)]
+
