@@ -2,6 +2,8 @@ module Task3 where
 
 import Data.Char
 
+--                - - - D A T A - - -
+
 type Row = (Char, Char, Char)
 type Grid = (Row, Row, Row)
 
@@ -18,6 +20,9 @@ emptyGrid = (('_', '_', '_'), ('_', '_', '_'), ('_', '_', '_'))
 --
 -- Valid values: X, O, _
 
+
+--                - - - G R I D   &   R O W   F U N C T I O N S - - -
+
 t0 :: (v, v, v) -> v
 t0 (a, _, _) = a
 
@@ -27,17 +32,16 @@ t1 (_, b, _) = b
 t2 :: (v, v, v) -> v
 t2 (_, _, c) = c
 
---                - - - G R I D   &   R O W   F U N C T I O N S - - -
 
-setGridValue :: Grid -> Int -> Int -> Char -> Grid
-setGridValue grid 0 y v = (setRowValue (t0 grid) y v, t1 grid, t2 grid)
-setGridValue grid 1 y v = (t0 grid, setRowValue (t1 grid) y v, t2 grid)
-setGridValue grid 2 y v = (t0 grid, t1 grid, setRowValue (t2 grid) y v)
+setGridValue :: Grid -> Char -> Int -> Int -> Grid
+setGridValue grid v 0 y = (setRowValue (t0 grid) v y, t1 grid, t2 grid)
+setGridValue grid v 1 y = (t0 grid, setRowValue (t1 grid) v y, t2 grid)
+setGridValue grid v 2 y = (t0 grid, t1 grid, setRowValue (t2 grid) v y)
 
-setRowValue :: Row -> Int -> Char -> Row
-setRowValue row 0 v = (v, t1 row, t2 row)
-setRowValue row 1 v = (t0 row, v, t2 row)
-setRowValue row 2 v = (t0 row, t1 row, v)
+setRowValue :: Row -> Char -> Int -> Row
+setRowValue row v 0 = (v, t1 row, t2 row)
+setRowValue row v 1 = (t0 row, v, t2 row)
+setRowValue row v 2 = (t0 row, t1 row, v)
 
 
 getGridValue :: Grid -> Int -> Int -> Char
@@ -58,6 +62,27 @@ isRowFull :: Row -> Bool
 isRowFull row = (t0 row /= '_') && (t1 row /= '_') && (t2 row /= '_')
 
 
+hasWonHorizontal :: Grid -> Char -> Int -> Bool
+hasWonHorizontal grid v y = (getGridValue grid 0 y == v) && (getGridValue grid 1 y == v) && (getGridValue grid 2 y == v)
+
+hasWonVertical   :: Grid -> Char -> Int -> Bool
+hasWonVertical   grid v x = (getGridValue grid x 0 == v) && (getGridValue grid x 1 == v) && (getGridValue grid x 2 == v)
+
+hasWonDiagonal   :: Grid -> Char -> Bool
+hasWonDiagonal   grid v   = (getGridValue grid 0 0 == v) && (getGridValue grid 1 1 == v) && (getGridValue grid 2 2 == v)
+
+hasWonDiagonal'  :: Grid -> Char -> Bool
+hasWonDiagonal'  grid v   = (getGridValue grid 2 0 == v) && (getGridValue grid 1 1 == v) && (getGridValue grid 0 2 == v)
+
+hasWon :: Grid -> Char -> Bool
+hasWon g v = (hasWonHorizontal g v 0) || (hasWonHorizontal g v 1) || (hasWonHorizontal g v 2) || 
+             (hasWonVertical   g v 0) || (hasWonVertical   g v 1) || (hasWonVertical   g v 2) ||
+             (hasWonDiagonal   g v)   || (hasWonDiagonal'  g v)
+
+hasWonAny :: Grid -> Bool
+hasWonAny grid = (hasWon grid 'X') || (hasWon grid 'O')
+
+
 isXYValid :: Int -> Int -> Bool
 isXYValid x y = (x >= 0) && (x < 3) && (y >= 0) && (y < 3)
 
@@ -76,7 +101,7 @@ parseDictLast :: String -> Grid -> Either (String, Int) (Grid, Char, String)
 parseDictLast ('l':'d':'4':':':'d':'a':'t':'a':'l':'i': x :'e':'i': y :'e':'1':':': v :'e':'e':'e' : t) grid = 
     case isXYValid (digitToInt x) (digitToInt y) of
         True -> case getGridValue grid (digitToInt x) (digitToInt y) == '_' of
-            True -> Right ( setGridValue grid (digitToInt x) (digitToInt y) v, v, t)
+            True -> Right ( setGridValue grid v (digitToInt x) (digitToInt y), v, t)
             False -> Left ("Duplicate value", length t)
         False -> Left ("Invalid X/Y", length t)
 
