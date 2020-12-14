@@ -112,11 +112,11 @@ showGrid grid = do
 --      Right: Filled grid, last move's symbol, remaining bencoded string
 parseDictLast :: String -> Grid -> Either (String, Int) (Grid, Char, String)
 parseDictLast ('l':'d':'4':':':'d':'a':'t':'a':'l':'i': x :'e':'i': y :'e':'1':':': v :'e':'e':'e' : t) grid = 
-    case isXYValid (digitToInt x) (digitToInt y) of
-        True -> case getGridValue grid (digitToInt x) (digitToInt y) == '_' of
-            True -> Right ( setGridValue grid v (digitToInt x) (digitToInt y), v, t)
-            False -> Left ("Duplicate value", length t)
-        False -> Left ("Invalid X/Y", length t)
+    if isXYValid (digitToInt x) (digitToInt y) then
+        if getGridValue grid (digitToInt x) (digitToInt y) == '_'
+        then Right ( setGridValue grid v (digitToInt x) (digitToInt y), v, t)
+        else Left ("Duplicate value", length t)
+    else Left ("Invalid X/Y", length t)
 
 parseDictLast ('4':':':'l':'a':'s':'t' : t) grid = parseDictLast t grid
 parseDictLast t _ = Left ("Invalid dictionary Last", length t)
@@ -173,21 +173,22 @@ parse msg
     | msg == "*" = (emptyGrid, 'O', 0)
     | otherwise = case parseDict msg emptyGrid of
         Right (val, lastMove, _) -> (val, lastMove, 0)
-        Left (err, _) -> case err == "Duplicate value" of
-            True -> (emptyGrid, '_', 101)
-            False -> (emptyGrid, '_', 100)
+        Left (err, _) -> if err == "Duplicate value" 
+            then (emptyGrid, '_', 101)
+            else (emptyGrid, '_', 100)
 
 
 --                - - - E N C O D E   F U N C T I O N S - - -
 
 
 -- Appends a bencoded representation of a new move to the existing move chain
--- IN: Input bencoded string, move x, move y, move symbol
+-- IN: Input bencoded string (or *), move x, move y, move symbol
 -- OUT: Bencoded string with new move appended
 encode :: String -> Int -> Int -> Char -> String
-encode msg x y v 
-    | msg == "*" = "d4:lastld4:datali" ++ show x ++ "ei" ++ show y ++ "e1:" ++ [v] ++ "eeee"
-    | otherwise  = "d4:lastld4:datali" ++ show x ++ "ei" ++ show y ++ "e1:" ++ [v] ++ "eee4:prev" ++ msg ++ "e"
+encode msg x y v = "d4:lastld4:datali" ++ show x ++ "ei" ++ show y ++ "e1:" ++ [v] ++ "eee" ++ msg' ++ "e"
+    where
+        msg' = if msg == "*" then ""
+            else "4:prev" ++ msg
 
 
 --                - - - M I N I M A X   A L G O R I T H M   F U N C T I O N S - - -
@@ -234,9 +235,8 @@ tryCallMinimax grid depth rv v x y
     | getGridValue grid x y == '_' =
         minimax (setGridValue grid v x y) depth rv v
     | otherwise = 
-        case rv == v of
-            True -> -1000 -- Trying to maximize
-            False -> 1000 -- Trying to minimize
+        if rv == v then -1000 -- Trying to maximize
+        else 1000 -- Trying to minimize
 
 
 -- Attempts to call minimax on the entire grid and gets the maximum/minimum score of all minimax calls
@@ -263,9 +263,9 @@ findBestMove' grid v x y
         score = tryCallMinimax grid 0 v v x y
 
         (x', y') = advanceXY x y
-        (x'', y'', score') = case y' > 2 of
-            False -> findBestMove' grid v x' y'
-            True -> (0, 0, -1000) -- Reached the end of the grid
+        (x'', y'', score') = if y' < 3
+            then findBestMove' grid v x' y'
+            else (0, 0, -1000) -- Reached the end of the grid
 
 
 -- Calls the findBestMove function and appends the appropriate exit code
@@ -276,13 +276,13 @@ findBestMove grid v = (x, y, code)
     where
         (x, y, _) = findBestMove' grid v 0 0
         grid' = setGridValue grid v x y
-        code = case hasWonAny grid' of
-            True -> case hasWon grid' v of
-                True -> 10
-                False -> -1000 -- We should _not_ be here
-            False -> case isGridFull grid' of
-                True -> 12
-                False -> 0
+        code
+            | hasWonAny grid' = 
+                if hasWon grid' v 
+                    then 10 -- Victory
+                    else - 1000 -- Loss - We should _not_ be here
+            | isGridFull grid' = 12
+            | otherwise = 0
 
 
 -- Checks if the game can continue to be played before calling findBestMove
@@ -296,18 +296,46 @@ findBestMovePregameCheck grid v
     | otherwise = findBestMove grid v
 
 
+--                - - - M A I N   C O D E - - -
+
+
+-- Maps exit codes to output messages
+-- IN: Exit code
+-- OUT: Informational message
+exitCodeMessage :: Int -> String
+exitCodeMessage 0   = "We are in the middle of a game"
+exitCodeMessage 10  = "Game over, I won!"
+exitCodeMessage 12  = "Game over, Draw!"
+exitCodeMessage 20  = "Game is over, board is full or someone won"
+exitCodeMessage 100 = "Message is malformed"
+exitCodeMessage 101 = "Message is invalid, 2 moves to the same cell"
+exitCodeMessage _   = "Unknown exit code"
+
+
+-- Prints message and then exits with exit code
+-- IN: Exit code
+-- OUT: 
+exitWithMessage :: Int -> IO ()
+exitWithMessage code = do
+    hPutStrLn stderr (exitCodeMessage code)
+    if code == 0 
+        then exitSuccess
+        else exitWith (ExitFailure code)
+
+
+-- Main function
 main :: IO ()
 main = do
     message <- getLine
     let (grid, v, code) = parse message
-    when (code /= 0) (exitWith (ExitFailure code))
+    when (code /= 0) (exitWithMessage code) -- Bencoded message was invalid
     
     hPutStrLn stderr "Current game state:"
     showGrid grid
     
     let v' = invertSymbol v
     let (x, y, code') = findBestMovePregameCheck grid v'
-    when (code' == 20) (exitWith (ExitFailure code'))
+    when (code' == 20) (exitWithMessage code') -- Game has already ended
     
     hPutStrLn stderr "My move: "
     putStrLn (show x ++ " " ++ show y ++ " " ++ [v'])
@@ -318,8 +346,5 @@ main = do
     let message' = encode message x y v'
     putStrLn message'
     
-    if code' == 0 then
-        exitWith ExitSuccess
-    else
-        exitWith (ExitFailure code')
+    exitWithMessage code'
 
