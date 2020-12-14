@@ -338,7 +338,7 @@ main = do
     when (code' == 20) (exitWithMessage code') -- Game has already ended
     
     hPutStrLn stderr "My move: "
-    putStrLn (show x ++ " " ++ show y ++ " " ++ [v'])
+    hPutStrLn stderr (show x ++ " " ++ show y ++ " " ++ [v'])
 
     hPutStrLn stderr "State after my move:"
     showGrid (setGridValue grid v' x y)
