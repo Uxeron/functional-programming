@@ -7,6 +7,7 @@ import System.IO
 import Control.Monad
 
 data JsonLikeValue = JLString String | JLInt Int | JLMap [(String, JsonLikeValue)] | JLArray [JsonLikeValue] deriving (Show, Eq)
+type StringPath = (String, String)
 
 --                - - - P A R S E   F U N C T I O N S - - -
 
@@ -77,3 +78,28 @@ parseValue ('d' : t) = parseDict t            -- Parse a dictionary
 parseValue (a : b : c : t) = parseString ([a, b, c] ++ t) -- Parse a string (needs to be at least 0:e, 3 symbols)
 parseValue _ = Left ("Invalid symbol", 0)     -- Invalid entry
 
+
+--                - - - D E P T H   -   F I R S T   S E A R C H - - -
+
+-- Does a depth-first search of the given JsonLikeValues and finds any strings
+-- IN: Path, data stored as JsonLikeValue
+-- OUT: List of (path, string) entries
+dfs :: String -> JsonLikeValue -> [StringPath]
+dfs path (JLArray list) = concat (map (dfsAppendPathList path) (zip [0..] list))
+dfs path (JLMap dict) = concat (map (dfsAppendPathDict path) dict)
+dfs path (JLInt int) = []
+dfs path (JLString str) = [(path ++ " = ", str)]
+
+
+-- Appends the appropriate path for a list entry
+-- IN: Path, list index, data
+-- OUT: List of (path, string) entries
+dfsAppendPathList :: String -> (Int, JsonLikeValue) -> [StringPath]
+dfsAppendPathList path (index, val) = dfs (path ++ "[" ++ (show index) ++ "]") val
+
+
+-- Appends the appropriate path for a dictionary entry
+-- IN: Path, dictionary key, data
+-- OUT: List of (path, string) entries
+dfsAppendPathDict :: String -> (String, JsonLikeValue) -> [StringPath]
+dfsAppendPathDict path (key, val) = dfs (path ++ "." ++ key) val
