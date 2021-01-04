@@ -2,6 +2,7 @@ module Task4 where
 
 import Data.List
 import Data.Char
+import Data.Ord
 import System.Exit
 import System.IO
 import Control.Monad
@@ -79,6 +80,15 @@ parseValue (a : b : c : t) = parseString ([a, b, c] ++ t) -- Parse a string (nee
 parseValue _ = Left ("Invalid symbol", 0)     -- Invalid entry
 
 
+-- Calls the actual bencode parser and handles errors
+-- IN: Bencoded string
+-- OUT: Parsed data, error found, error message
+parse :: String -> (JsonLikeValue, Bool, String)
+parse str = case parseValue str of
+    Right (val, _) -> (val, False, "")
+    Left (err, pos) -> (JLArray [], True, err ++ " at position " ++ show (length str - pos))
+
+
 --                - - - D E P T H   -   F I R S T   S E A R C H - - -
 
 -- Does a depth-first search of the given JsonLikeValues and finds any strings
@@ -103,3 +113,44 @@ dfsAppendPathList path (index, val) = dfs (path ++ "[" ++ (show index) ++ "]") v
 -- OUT: List of (path, string) entries
 dfsAppendPathDict :: String -> (String, JsonLikeValue) -> [StringPath]
 dfsAppendPathDict path (key, val) = dfs (path ++ "." ++ key) val
+
+
+--                        - - - M A I N   C O D E - - -
+
+-- Prints the first five strings in the passed (path, string) list
+-- IN: List of (path, string) entries, list index
+-- OUT: IO
+printFirst5Strings :: [StringPath] -> Int -> IO ()
+printFirst5Strings list index
+    | index > 4 = return ()
+    | index < length list = do
+        putStrLn (fst (list!!index) ++ "\"" ++  snd (list!!index) ++ "\"")
+        printFirst5Strings list (index + 1)
+    | otherwise = return ()
+
+
+-- Prints message and then exits with exit code
+-- IN: Error found, error message
+-- OUT: IO
+exitWithMessage :: Bool -> String -> IO ()
+exitWithMessage error message = do
+    if error
+        then do
+            hPutStrLn stderr message
+            exitWith (ExitFailure 1) 
+        else exitSuccess
+
+
+-- Main function
+main :: IO ()
+main = do
+    message <- getLine
+    let (parsedData, error, errMsg) = parse message
+    when error (exitWithMessage True errMsg)
+
+    let stringPathList = dfs "root" parsedData
+    let stringPathListSorted = sortBy (comparing (length . snd)) stringPathList
+
+    printFirst5Strings stringPathListSorted 0
+
+    exitWithMessage False ""
