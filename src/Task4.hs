@@ -61,7 +61,7 @@ parseDict ('e' : t) = Right (JLMap [], t)
 parseDict str = case parseString str of -- Parse the key
         Right (JLString key, t) -> case parseValue t of -- Parse the value
             Right (val, t') -> case parseDict t' of -- Parse the next dictionary entry
-                Right (JLMap dict, t'') -> Right (JLMap ([(key, val)] ++ dict), t'')
+                Right (JLMap dict, t'') -> Right (JLMap ((key, val) : dict), t'')
                 Left err -> Left err
             Left err -> Left err
         Left err -> Left err
@@ -76,7 +76,7 @@ parseValue ('e' : t) = Right (JLArray [], t)  -- End of data structure, return e
 parseValue ('i' : t) = parseInt ("i" ++ t)    -- Parse an Integer
 parseValue ('l' : t) = parseList t            -- Parse a List
 parseValue ('d' : t) = parseDict t            -- Parse a dictionary
-parseValue (a : b : c : t) = parseString ([a, b, c] ++ t) -- Parse a string (needs to be at least 0:e, 3 symbols)
+parseValue (a : b : t) = parseString ([a, b] ++ t) -- Parse a string (needs to be at least 0:, 2 symbols)
 parseValue _ = Left ("Invalid symbol", 0)     -- Invalid entry
 
 
